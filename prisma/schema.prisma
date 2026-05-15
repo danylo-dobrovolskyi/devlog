@@ -1,0 +1,55 @@
+// DevLog data model
+//
+// SQLite stores enums as TEXT with a CHECK constraint via Prisma. That's
+// fine for a single-user local app — we trade Postgres-grade enums for a
+// zero-setup database file.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Status {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  status      Status   @default(TODO)
+  priority    Priority @default(MEDIUM)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subtasks Subtask[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model Subtask {
+  id        String   @id @default(cuid())
+  title     String
+  done      Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
