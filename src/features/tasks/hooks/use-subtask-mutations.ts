@@ -3,9 +3,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { subtasksApi } from "../api/tasks.client";
+import { subtasksApi, type TasksPage } from "../api/tasks.client";
 import type { Task } from "../types";
 import { tasksKeys } from "./use-tasks";
+
+type TasksCache = TasksPage | Task[];
+
+function patchTasksList(
+  data: TasksCache | undefined,
+  patchTaskList: (tasks: Task[]) => Task[],
+): TasksCache | undefined {
+  if (data === undefined) return undefined;
+  if (Array.isArray(data)) return patchTaskList(data);
+  return { ...data, tasks: patchTaskList(data.tasks) };
+}
 
 export function useCreateSubtasksBulk(taskId: string) {
   const queryClient = useQueryClient();
@@ -34,17 +45,19 @@ export function useDeleteSubtask() {
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: tasksKeys.all });
 
-      const previous = queryClient.getQueriesData<Task[]>({
+      const previous = queryClient.getQueriesData<TasksCache>({
         queryKey: tasksKeys.all,
       });
 
-      queryClient.setQueriesData<Task[]>(
+      queryClient.setQueriesData<TasksCache>(
         { queryKey: tasksKeys.all },
-        (tasks) =>
-          tasks?.map((task) => ({
-            ...task,
-            subtasks: task.subtasks.filter((subtask) => subtask.id !== id),
-          })),
+        (cached) =>
+          patchTasksList(cached, (tasks) =>
+            tasks.map((task) => ({
+              ...task,
+              subtasks: task.subtasks.filter((subtask) => subtask.id !== id),
+            })),
+          ),
       );
 
       return { previous };
@@ -77,19 +90,21 @@ export function useToggleSubtask() {
     onMutate: async ({ id, done }) => {
       await queryClient.cancelQueries({ queryKey: tasksKeys.all });
 
-      const previous = queryClient.getQueriesData<Task[]>({
+      const previous = queryClient.getQueriesData<TasksCache>({
         queryKey: tasksKeys.all,
       });
 
-      queryClient.setQueriesData<Task[]>(
+      queryClient.setQueriesData<TasksCache>(
         { queryKey: tasksKeys.all },
-        (tasks) =>
-          tasks?.map((task) => ({
-            ...task,
-            subtasks: task.subtasks.map((subtask) =>
-              subtask.id === id ? { ...subtask, done } : subtask,
-            ),
-          })),
+        (cached) =>
+          patchTasksList(cached, (tasks) =>
+            tasks.map((task) => ({
+              ...task,
+              subtasks: task.subtasks.map((subtask) =>
+                subtask.id === id ? { ...subtask, done } : subtask,
+              ),
+            })),
+          ),
       );
 
       return { previous };
